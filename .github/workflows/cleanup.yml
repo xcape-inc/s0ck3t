@@ -19,7 +19,7 @@ jobs:
   build-x64:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/delete-package-versions@v4
+      - uses: actions/delete-package-versions@v5
         with:
           # Can be a single package version id, or a comma separated list of package version ids.
           # Defaults to an empty string.
