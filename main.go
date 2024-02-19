@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/armon/go-socks5"
 	"log"
 	"os"
+
+	"github.com/armon/go-socks5"
 )
 
 func main() {
@@ -16,12 +17,12 @@ func main() {
 	// build socks server
 	server, err := socks5.New(&socks5.Config{})
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	// start listener
 	fmt.Println("Running...")
 	if err := server.ListenAndServe("tcp", "127.0.0.1:"+fmt.Sprint(os.Args[1])); err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 }
