@@ -15,15 +15,13 @@ const (
 )
 
 func main() {
-	// check args
-	/*if len(os.Args) < 2 {
-		log.Fatal("USAGE: <", os.Args[0], "> <port>")
-	}*/
-	//os.Args = []string{os.Args[0], "-help"}
+	// ensure flag module is reset (can do weird things in tests)
 	oldWriter := flag.CommandLine.Output()
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	//restore the writer
 	flag.CommandLine.SetOutput(oldWriter)
+
+	// Set the usage text
 	flag.Usage = func() {
 		callerPath := os.Args[0]
 		_, callerName := filepath.Split(callerPath)
@@ -32,6 +30,7 @@ func main() {
 	}
 	flag.CommandLine.Usage = flag.Usage
 
+	// check args
 	flag.Parse()
 	if flag.NArg() != 1 {
 		flag.Usage()
