@@ -72,13 +72,17 @@ jobs:
           retention-days: 5
 
       - name: Test with Go
-        run: go test -json > TestResults-amd64.json
+        run: go test -coverprofile=coverage.out -json > TestResults-amd64.json
 
       - name: Upload Go test results
         uses: actions/upload-artifact@v4
         with:
           name: Go-results-amd64
-          path: TestResults-amd64.json
+          path: |
+            TestResults-amd64.json
+            coverage.out
+
+      # TODO: add step to publish documentation, test results, and code coverage and web pages and assets
 
   build-arm64:
     runs-on: ubuntu-latest
