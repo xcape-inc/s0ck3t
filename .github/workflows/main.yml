@@ -61,14 +61,24 @@ jobs:
 
       - name: Build amd64
         run: |
-          make s0ck3t-linux-amd64 BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-amd64 s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-amd64
+          make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-amd64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-amd64
+          make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-amd64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-amd64
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
         with:
           name: s0ck3t-amd64
-          path: s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-amd64
+          path: s0ck3t_v${{ steps.get_versions.outputs.build_version }}_*
           retention-days: 5
+
+      - name: Test with Go
+        run: go test -json > TestResults-amd64.json
+
+      - name: Upload Go test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Go-results-amd64
+          path: TestResults-amd64.json
 
   build-arm64:
     runs-on: ubuntu-latest
@@ -113,13 +123,14 @@ jobs:
 
       - name: Build arm64
         run: |
-          make s0ck3t-linux-arm64 BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm64 s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm64
+          make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm64
+          make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm64
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
         with:
           name: s0ck3t-arm64
-          path: s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm64
+          path: s0ck3t_v${{ steps.get_versions.outputs.build_version }}_*
           retention-days: 5
 
   build-arm:
@@ -165,13 +176,14 @@ jobs:
 
       - name: Build arm
         run: |
-          make s0ck3t-linux-arm BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm
+          make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm
+          make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
         with:
           name: s0ck3t-arm
-          path: s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm
+          path: s0ck3t_v${{ steps.get_versions.outputs.build_version }}_*
           retention-days: 5
 
   # This workflow contains a single job called "build"

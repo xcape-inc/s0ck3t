@@ -2,5 +2,5 @@
 /.env.*
 /s0ck3t-*
 /.docker/s0ck3t-*
-/s0ck3t_*.tar
+/s0ck3t_*
 /__debug_bin
