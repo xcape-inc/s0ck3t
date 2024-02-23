@@ -1,0 +1,7 @@
+target "app-docker-metadata-action" {}
+
+target "app" {}
+
+target "app-with-metadata" {
+ inherits = ["app", "app-docker-metadata-action"]
+}

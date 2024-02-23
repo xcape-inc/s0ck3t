@@ -1,0 +1,15 @@
+version: '3'
+services:
+  devcontainer:
+    build:
+      dockerfile: "Dockerfile"
+      args:
+        VERSION: ${VERSION}
+        LONG_FORM_VERSION: ${LONG_FORM_VERSION}
+      context: .
+      x-bake:
+        cache-from:
+          - type=registry,ref=${CI_REGISTRY_IMAGE}/devcontainer:cache
+          - type=registry,ref=${CI_REGISTRY_IMAGE}/devcontainer:cache-linux-arm6
+          - type=registry,ref=${CI_REGISTRY_IMAGE}/devcontainer:cache-linux-arm64
+          - type=registry,ref=${CI_REGISTRY_IMAGE}/devcontainer:cache-linux-amd64
