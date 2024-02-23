@@ -18,6 +18,151 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  build-and-push-devcontainer-image:
+    runs-on: ubuntu-latest
+
+    # allow access to github docker registry
+    permissions:
+      contents: read
+      packages: write
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checkout the code
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # figure out what version this should be
+      - name: get the current dynamic git version numbers
+        id: get_versions
+        run: |
+          git clone https://github.com/xcape-inc/ci-tools.git --branch main --single-branch .git/ci-tools
+          . .git/ci-tools/get_tag_from_git.sh > /dev/null
+          echo "cur_version=${CUR_VERSION}" >> $GITHUB_OUTPUT
+          echo "long_form_cur_version=${LONG_FORM_CUR_VERSION}" >> $GITHUB_OUTPUT
+          BUILD_VER=$(printf '%s' "${CUR_VERSION}" | sed "s/^v\\([0-9.]*\\)\\(.*\\)/\\1-\\2/" | sed "s/\\(\\.*\\)-\$//")
+          echo "build_version=${BUILD_VER}" >> $GITHUB_OUTPUT
+
+      # displaye the detected version info
+      - name: show version
+        run: |
+          echo Short version: ${{ steps.get_versions.outputs.cur_version }}
+          echo Long version: ${{ steps.get_versions.outputs.long_form_cur_version }}
+          echo Build version: ${{ steps.get_versions.outputs.build_version }}
+
+      # the commit short sha is the main tag for the artifact as it can be directly traced to the git commit
+      - name: Set short sha
+        id: shortsha
+        run: echo "sha_short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # figure out if we are on a branch; that can be used to tage the image too
+      - name: Extract branch name
+        id: extract_branch
+        shell: bash
+        run: echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      # display the captured branch name
+      - name: Current branch
+        run: echo ${{ steps.extract_branch.outputs.branch }}
+
+      # Add support for more platforms with QEMU (optional)
+      # https://github.com/docker/setup-qemu-action
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          # Add whatever platforms you need in addition to x86_64
+          platforms: 'arm64,arm'
+
+      # configure the docker buildx environment (and use the buildkit engine)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # authenticate to Github's docker image repo (ghcr.io)
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Automatically gather details about the image to be built. This will be the branch name and the components of the tag if this is a tag build (eg. 1,1.0,1.0.1)
+      # TODO: you would need some more logic if, for example you have a v1 that should point to v1.1.x, but then spin a v1.0.x
+      # as that would presently set v1 back to v1.0.x
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha
+          labels: |
+            org.opencontainers.image.ref.name=${{ github.ref }}
+      
+      # Add some more possible tags. Right now we have commit short-sha, branch name, semver component from the commit tag
+      # This adds the value of BUILD_VER from above (eg. 1.0.1a2) and latest is this is the main branch
+      - name: Compute image tags
+        id: get_image_tags
+        shell: bash
+        # append the version if on a branch and matches a version tag and append latest if on main branch
+        run: |
+          TAGS="${{ steps.meta.outputs.tags }}"
+          TAGS=$(ARRAY=( $(printf '%s' "${TAGS}") ); IFS=","; printf "${ARRAY[*]}")
+          if [[ "${GITHUB_REF}" =~ ^refs/heads/ ]]; then
+            BUILD_VER="${{ steps.get_versions.outputs.build_version }}"
+            PATTERN_MATCHED=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+\\.[0-9]+)?.*\$/\\1/p")
+            if [[ "${BUILD_VER}" == "${PATTERN_MATCHED}" ]]; then
+              BUILD_MINOR_VER=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+)?.*\$/\\1/p")
+              BUILD_MAJOR_VER=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+)?.*\$/\\1/p")
+              TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BUILD_VER},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BUILD_MAJOR_VER},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BUILD_MINOR_VER}"
+            fi
+            if [[ 'main' == "${{ steps.extract_branch.outputs.branch }}" ]]; then
+              TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            fi
+          fi
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+
+      # display the tags and labels we will use for the docker image
+      - name: Show docker tags and labels
+        run: |
+          echo "docker image tags: ${{ steps.get_image_tags.outputs.tags }}"
+          echo "docker image labels: ${{ steps.meta.outputs.labels }}"
+          echo "docker image description annotation: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}"
+
+      # build the images
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          pull: true
+          # This is handled by the outputs directive
+          #push: true
+          # Add whatever platforms you need
+          platforms: linux/amd64,linux/arm64,linux/arm/v6
+          tags: ${{ steps.get_image_tags.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}-cache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}-cache,mode=max
+          # TODO: need to actually translate the labels to annotations, but this is a PoC
+          outputs: |
+            type=registry,annotation-manifest-descriptor.org.opencontainers.image.title=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.title'] }},annotation-manifest-descriptor.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }},annotation.org.opencontainers.image.title=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.title'] }},annotation.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }},annotation-index.org.opencontainers.image.title=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.title'] }},annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
+          build-args: |
+            VERSION=${{ steps.get_versions.outputs.cur_version }}
+            LONG_FORM_VERSION=${{ steps.get_versions.outputs.long_form_cur_version }}
+
+    # store these valus in case another stage is added to run afterwards, such as to use the image for some purpose
+    outputs:
+      cur_version: ${{ steps.get_versions.outputs.cur_version }}
+      long_form_cur_version: ${{ steps.get_versions.outputs.long_form_cur_version }}
+      sha_short: ${{ steps.shortsha.outputs.sha_short }}
+
   build-x64:
     runs-on: ubuntu-latest
     steps:
