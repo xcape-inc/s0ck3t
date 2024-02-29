@@ -102,6 +102,10 @@ ENTRYPOINT [ "/usr/local/share/docker-init.sh" ]
 CMD [ "sleep", "infinity" ]
 
 USER root
+
+# Work around for https://github.com/actions/checkout/issues/956 so this container can be used in github ci
+RUN mkdir -m 1777 /__w
+
 ARG VERSION=unset
 ARG LONG_FORM_VERSION=unset
 
