@@ -74,7 +74,7 @@ echo '{
 
 # Add tags if we have any
 if [ -n "${TAGS:-}" ]; then
-    sed -i.bak -e  's|"tags": '"\\"'['"\\"'],|"tags": ['"\\"'n                '"${TAGS}\\"'n            ],|' "${SCRIPT_DIR}"/${DOCKER_SERVICE_PREFIX:-}docker-metadata-action-bake.json
+    sed -i.bak -e  's|"tags": '"\\"'['"\\"'],|"tags": ['"\\"'n                "'"${TAGS}"'"'"\\"'n            ],|' "${SCRIPT_DIR}"/${DOCKER_SERVICE_PREFIX:-}docker-metadata-action-bake.json
     rm -f "${SCRIPT_DIR}"/${DOCKER_SERVICE_PREFIX:-}docker-metadata-action-bake.json.bak
 fi
 
