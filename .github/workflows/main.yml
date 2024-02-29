@@ -236,7 +236,7 @@ jobs:
           echo '-- /github/home --'
           ls -la /github/home
           echo '-- /github/workflow --'
-          la -la /github/workflow
+          ls -la /github/workflow
           echo '-- /__w/_temp/_runner_file_commands --'
           ls -la /__w/_temp/_runner_file_commands
 
