@@ -27,6 +27,7 @@ env:
   CI_COMMIT_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
   CI_COMMIT_REF_SLUG: ${{ github.ref_name }}
   CI_COMMIT_REF_NAME: ${{ github.ref_name }}
+  GIT_REF: ${{ github.ref }}
   # These are not built in, but can be figured out
   #CI_RUNNER_ID: ${RUNNER_NAME}
 
@@ -118,28 +119,56 @@ jobs:
           labels: |
             org.opencontainers.image.ref.name=${{ github.ref }}
       
-      # Add some more possible tags. Right now we have commit short-sha, branch name, semver component from the commit tag
-      # This adds the value of BUILD_VER from above (eg. 1.0.1a2) and latest is this is the main branch
+    # Calculate possible image tags. Right now we have commit short-sha, branch name, semver components from the commit tag,
+    # the value of BUILD_VER from above (eg. 1.0.1a2) and latest if this is the main branch also
+    # append the version if on a branch and matches a version tag and append latest if on main branch
       - name: Compute image tags
         id: get_image_tags
         shell: bash
         # append the version if on a branch and matches a version tag and append latest if on main branch
         run: |
-          TAGS="${{ steps.meta.outputs.tags }}"
-          TAGS=$(ARRAY=( $(printf '%s' "${TAGS}") ); IFS=","; printf "${ARRAY[*]}")
-          if [[ "${GITHUB_REF}" =~ ^refs/heads/ ]]; then
-            BUILD_VER="${{ steps.get_versions.outputs.build_version }}"
+          BUILD_VER=${{ steps.get_versions.outputs.build_version }}
+          # TODO: this needs to be standardized. it needs to be done for each image being minted
+          NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${CI_COMMIT_REF_SLUG}"
+          TAGS="\"${NEW_TAG}\""
+          TAGS_ARCH="\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+          TAG_OR_HEAD_REF_MATCH=$(printf '%s' "${GIT_REF}" | sed -n "s,^\\(refs/tags/v|refs/heads/\\).*,\\1,p")
+          if [[ '' != "${TAG_OR_HEAD_REF_MATCH:-}" ]]; then
             PATTERN_MATCHED=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+\\.[0-9]+)?.*\$/\\1/p")
             if [[ "${BUILD_VER}" == "${PATTERN_MATCHED}" ]]; then
               BUILD_MINOR_VER=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+)?.*\$/\\1/p")
               BUILD_MAJOR_VER=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+)?.*\$/\\1/p")
-              TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BUILD_VER},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BUILD_MAJOR_VER},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BUILD_MINOR_VER}"
+
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${BUILD_VER}"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${BUILD_MAJOR_VER}"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${BUILD_MINOR_VER}"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
             fi
-            if [[ 'main' == "${{ steps.extract_branch.outputs.branch }}" ]]; then
-              TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            if [[ 'main' == "${CI_COMMIT_BRANCH:-}" ]]; then
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:latest"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
             fi
           fi
+          NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${CI_COMMIT_SHORT_SHA}"
+          TAGS="${TAGS},\"${NEW_TAG}\""
+          TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+          export TAGS
+          export TAGS_NOARCH="${TAGS}"
+          export TAGS_ARCH
+          
+          if [ -n "${PLATFORM_ARCH:-}" ]; then export TAGS="${TAGS_ARCH}"; fi
+
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "tags_noarch=${TAGS_NOARCH}" >> $GITHUB_OUTPUT
+          echo "tags_arch=${TAGS_ARCH}" >> $GITHUB_OUTPUT
 
       # display the tags and labels we will use for the docker image
       - name: Show docker tags and labels
@@ -148,19 +177,20 @@ jobs:
           echo "docker image labels: ${{ steps.meta.outputs.labels }}"
           echo "docker image description annotation: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}"
 
-      # TODO: need to translate the env vars from github to gitlab
-
       # build the images
       - name: Build and push Docker image
         run: |
           export CI_RUNNER_ID=${RUNNER_NAME}
+          export TAGS=${{ steps.get_image_tags.outputs.tags }}"
+          export TAGS_NOARCH=${{ steps.get_image_tags.outputs.tags_noarch }}"
+          export TAGS_ARCH=${{ steps.get_image_tags.outputs.tags_arch }}"
           if [ -n "${PLATFORM_ARCH:-}" ]; then export TAGS="${TAGS_ARCH}"; fi
           #if [[ 'main' == "${CI_COMMIT_BRANCH:-}" || 'master' == "${CI_COMMIT_BRANCH:-}" ]]; then
             PUSH_BUILD_CACHE=true
           #else
           #  echo "** Skipping Build cache push due to branch '${CI_COMMIT_BRANCH:-}' != 'main' or 'master'"
           #fi
-          . .devcontainer/get_versions.sh
+
           env
           DOCKER_SERVICES="devcontainer" USE_BUILDX_BUILDER=true PULL_IMAGES=true PUSH_IMAGE=true PUSH_BUILD_CACHE=${PUSH_BUILD_CACHE:-} .devcontainer/build_docker_images.sh
 
