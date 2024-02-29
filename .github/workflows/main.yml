@@ -174,20 +174,20 @@ jobs:
       # display the tags and labels we will use for the docker image
       - name: Show docker tags and labels
         run: |
-          echo "docker image tags: ${{ steps.get_image_tags.outputs.tags }}"
-          echo "docker image labels: ${{ steps.meta.outputs.labels }}"
-          echo "docker image description annotation: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}"
+          echo 'docker image tags: ${{ steps.get_image_tags.outputs.tags }}'
+          echo 'docker image labels: ${{ steps.meta.outputs.labels }}'
+          echo 'docker image description annotation: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}'
 
       # build the images
       - name: Build and push Docker image
         run: |
-          export CUR_VERSION=${{ steps.get_versions.outputs.cur_version }}
-          export LONG_FORM_CUR_VERSION=${{ steps.get_versions.outputs.long_form_cur_version }}
-          export BUILD_VER=${{ steps.get_versions.outputs.build_version }}
+          export CUR_VERSION='${{ steps.get_versions.outputs.cur_version }}''
+          export LONG_FORM_CUR_VERSION='${{ steps.get_versions.outputs.long_form_cur_version }}''
+          export BUILD_VER='${{ steps.get_versions.outputs.build_version }}''
           export CI_RUNNER_ID="${RUNNER_NAME}"
-          export TAGS="${{ steps.get_image_tags.outputs.tags }}"
-          export TAGS_NOARCH="${{ steps.get_image_tags.outputs.tags_noarch }}"
-          export TAGS_ARCH="${{ steps.get_image_tags.outputs.tags_arch }}"
+          export TAGS='${{ steps.get_image_tags.outputs.tags }}'
+          export TAGS_NOARCH='${{ steps.get_image_tags.outputs.tags_noarch }}'
+          export TAGS_ARCH='${{ steps.get_image_tags.outputs.tags_arch }}'
           if [ -n "${PLATFORM_ARCH:-}" ]; then export TAGS="${TAGS_ARCH}"; fi
           #if [[ 'main' == "${CI_COMMIT_BRANCH:-}" || 'master' == "${CI_COMMIT_BRANCH:-}" ]]; then
             PUSH_BUILD_CACHE=true
