@@ -181,8 +181,8 @@ jobs:
       - name: Build and push Docker image
         run: |
           export CI_RUNNER_ID=${RUNNER_NAME}
-          export TAGS=${{ steps.get_image_tags.outputs.tags }}"
-          export TAGS_NOARCH=${{ steps.get_image_tags.outputs.tags_noarch }}"
+          export TAGS="${{ steps.get_image_tags.outputs.tags }}"
+          export TAGS_NOARCH="${{ steps.get_image_tags.outputs.tags_noarch }}"
           export TAGS_ARCH=${{ steps.get_image_tags.outputs.tags_arch }}"
           if [ -n "${PLATFORM_ARCH:-}" ]; then export TAGS="${TAGS_ARCH}"; fi
           #if [[ 'main' == "${CI_COMMIT_BRANCH:-}" || 'master' == "${CI_COMMIT_BRANCH:-}" ]]; then
