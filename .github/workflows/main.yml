@@ -162,7 +162,7 @@ jobs:
           #else
           #  echo "** Skipping Build cache push due to branch '${CI_COMMIT_BRANCH:-}' != 'main' or 'master'"
           #fi
-          DOCKER_SERVICES="devcontainer" USE_BUILDX_BUILDER=true DOCKER_CONTEXT=dind PULL_IMAGES=true PUSH_IMAGE=true PUSH_BUILD_CACHE=${PUSH_BUILD_CACHE:-} .devcontainer/build_docker_images.sh
+          DOCKER_SERVICES="devcontainer" USE_BUILDX_BUILDER=true PULL_IMAGES=true PUSH_IMAGE=true PUSH_BUILD_CACHE=${PUSH_BUILD_CACHE:-} .devcontainer/build_docker_images.sh
 
     # store these values in case another stage is added to run afterwards, such as to use the image for some purpose
     outputs:
