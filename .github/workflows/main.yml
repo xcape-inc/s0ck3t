@@ -128,6 +128,7 @@ jobs:
         # append the version if on a branch and matches a version tag and append latest if on main branch
         run: |
           BUILD_VER=${{ steps.get_versions.outputs.build_version }}
+          CI_COMMIT_SHORT_SHA=${{ steps.shortsha.outputs.sha_short }}
           # TODO: this needs to be standardized. it needs to be done for each image being minted
           NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${CI_COMMIT_REF_SLUG}"
           TAGS="\"${NEW_TAG}\""
@@ -180,6 +181,9 @@ jobs:
       # build the images
       - name: Build and push Docker image
         run: |
+          export CUR_VERSION=${{ steps.get_versions.outputs.cur_version }}
+          export LONG_FORM_CUR_VERSION=${{ steps.get_versions.outputs.long_form_cur_version }}
+          export BUILD_VER=${{ steps.get_versions.outputs.build_version }}
           export CI_RUNNER_ID="${RUNNER_NAME}"
           export TAGS="${{ steps.get_image_tags.outputs.tags }}"
           export TAGS_NOARCH="${{ steps.get_image_tags.outputs.tags_noarch }}"
