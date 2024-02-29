@@ -39,7 +39,7 @@ else
 fi
 
 # Anything that is being copied into the dockerfile should get its permissions force here; git occassionally mangles stuff
-if [ which shasum ]; then
+if ( which shasum ); then
   SHASUM_CMD=shasum
 else
   SHASUM_CMD=sha1sum
