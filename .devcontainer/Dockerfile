@@ -104,7 +104,15 @@ CMD [ "sleep", "infinity" ]
 USER root
 
 # Work around for https://github.com/actions/checkout/issues/956 so this container can be used in github ci
-RUN mkdir -m 1777 /__w
+RUN mkdir -p \
+    /__w/s0ck3t/s0ck3t \
+    /__e \
+    /__w/_temp \
+    /__w/_actions \
+    /__t \
+    /github/home \
+    /github/workflow && \
+    chmod -R 1777 /__w /__e /__t /github
 
 ARG VERSION=unset
 ARG LONG_FORM_VERSION=unset
