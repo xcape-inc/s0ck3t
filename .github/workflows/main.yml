@@ -246,7 +246,7 @@ jobs:
       - build-and-push-devcontainer-image
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ env.IMAGE_NAME }/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+      image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
 
     steps:
       - name: Checkout
@@ -299,7 +299,7 @@ jobs:
       - build-and-push-devcontainer-image
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ env.IMAGE_NAME }/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+      image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
 
     steps:
       - name: Checkout
