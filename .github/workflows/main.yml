@@ -213,8 +213,33 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+      # work around for https://github.com/actions/checkout/issues/956
+      # thanks, I hate it.
+      # options: --user root
 
     steps:
+      - name: Fix Incompatible user from 956
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          la -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
