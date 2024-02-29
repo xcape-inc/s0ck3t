@@ -197,6 +197,7 @@ jobs:
 
           env
           pwd
+          ls -la
           cd .devcontainer
           DOCKER_SERVICES="devcontainer" USE_BUILDX_BUILDER=true PULL_IMAGES=true PUSH_IMAGE=true PUSH_BUILD_CACHE=${PUSH_BUILD_CACHE:-} .devcontainer/build_docker_images.sh
 
