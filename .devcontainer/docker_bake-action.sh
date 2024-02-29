@@ -100,8 +100,6 @@ fi
 
 ARCH_FLAG="--set "'*'".platform=linux/${PLATFORM_ARCH}"
 cd "${SCRIPT_DIR}"
-env
-pwd
 # TODO: may have to make the .hcl target dynamically generate so container names in docker-compose match
 # TODO: need to build everything in parallel for multiple images (local builds need that, though ci does not. how would you store on github though?)
 BUILDKIT_PROGRESS=${BUILDKIT_PROGRESS_FLAG:-} VERSION="${CUR_VERSION}" LONG_FORM_VERSION="${LONG_FORM_CUR_VERSION}" docker buildx bake --file *bake.metadata-merger.hcl --file docker-compose.yml --file docker-compose.build.yml --file *docker-metadata-action-bake.json ${PUSH_CACHE_FLAG:-} ${ARCH_FLAG} ${OUTPUT_SETTINGS:-} --metadata-file metadata-file ${PROVENANCE_FLAG:-} ${PULL_FLAG:-} --print ${DOCKER_SERVICES_W_META[*]}
