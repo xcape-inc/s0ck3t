@@ -241,7 +241,9 @@ jobs:
           ls -la /__w/_temp/_runner_file_commands
           sudo groupadd -g 127 github
           sudo usermod -aG github vscode
-          sudo chmod -R +w /__w/_temp/_runner_file_commands
+          sudo chmod g+w /__w/_temp/_runner_file_commands
+          sudo chmod g+w /__w/_temp/_runner_file_commands/*
+          ls -la /__w/_temp/_runner_file_commands
 
       - name: Checkout
         uses: actions/checkout@v4
