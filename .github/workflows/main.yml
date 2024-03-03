@@ -561,6 +561,7 @@ jobs:
           retention-days: 5
 
   # This workflow contains a single job called "build"
+  # TODO: this pattern probably needs some work to match the devcontainer image build pattern using the devcontainer env
   build-and-push-image:
     needs:
       - build-x64
@@ -631,7 +632,7 @@ jobs:
           platforms: 'arm64,arm'
 
       # configure the docker buildx environment (and use the buildkit engine)
-      - name: Set up g
+      - name: Set up docker buildx
         uses: docker/setup-buildx-action@v3
 
       # authenticate to Github's docker image repo (ghcr.io)
