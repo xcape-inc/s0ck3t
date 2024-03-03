@@ -215,7 +215,10 @@ jobs:
       image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
       # work around for https://github.com/actions/checkout/issues/956
       # thanks, I hate it.
-      options: --user root
+      # options: --user root
+    defaults:
+      run:
+        shell: /bin/bash -e {0}
 
     steps:
       - name: Fix Incompatible user from 956
@@ -239,20 +242,18 @@ jobs:
           ls -la /github/workflow
           echo '-- /__w/_temp/_runner_file_commands --'
           ls -la /__w/_temp/_runner_file_commands
+          # Fixes the unknown group
           sudo groupadd -g 127 github
-          sudo usermod -aG github vscode
-          sudo chmod g+w /__w/_temp/_runner_file_commands
-          sudo chmod g+w /__w/_temp/_runner_file_commands/*
-          sudo chmod g+w /__w/s0ck3t/s0ck3t
-          ls -la /__w/_temp/_runner_file_commands
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: hjkigvbhjg
+          # Fix the permissions on the home directory for the updated user ID
+          sudo chown -R 1001:1001 /home/vscode
+          # Changes the user id of the vscode user to 1001
+          sudo usermod -u 1001 -g 1001 -aG github vscode
+      
+      - name: Verify new user id
         run: |
+          id -u
+          id -g
+          whoami
           echo '-- /__w/s0ck3t/s0ck3t --'
           ls -la /__w/s0ck3t/s0ck3t
           echo '-- /__e --'
@@ -269,12 +270,14 @@ jobs:
           ls -la /github/workflow
           echo '-- /__w/_temp/_runner_file_commands --'
           ls -la /__w/_temp/_runner_file_commands
-          echo '-- /__w/_temp/_runner_file_commands --'
-          ls -la /__w/_temp/_runner_file_commands
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: get the current dynamic git version numbers
         id: get_versions
-        shell: /bin/bash -e {0}
         run: |
           git clone https://github.com/xcape-inc/ci-tools.git --branch main --single-branch .git/ci-tools
           . .git/ci-tools/get_tag_from_git.sh > /dev/null
@@ -337,8 +340,61 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+    defaults:
+      run:
+        shell: /bin/bash -e {0}
 
     steps:
+      - name: Fix Incompatible user from 956
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          # Fixes the unknown group
+          sudo groupadd -g 127 github
+          # Fix the permissions on the home directory for the updated user ID
+          sudo chown -R 1001:1001 /home/vscode
+          # Changes the user id of the vscode user to 1001
+          sudo usermod -u 1001 -g 1001 -aG github vscode
+      
+      - name: Verify new user id
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -390,8 +446,61 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+    defaults:
+      run:
+        shell: /bin/bash -e {0}
 
     steps:
+      - name: Fix Incompatible user from 956
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          # Fixes the unknown group
+          sudo groupadd -g 127 github
+          # Fix the permissions on the home directory for the updated user ID
+          sudo chown -R 1001:1001 /home/vscode
+          # Changes the user id of the vscode user to 1001
+          sudo usermod -u 1001 -g 1001 -aG github vscode
+      
+      - name: Verify new user id
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
