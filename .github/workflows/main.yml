@@ -130,7 +130,12 @@ jobs:
           BUILD_VER=${{ steps.get_versions.outputs.build_version }}
           CI_COMMIT_SHORT_SHA=${{ steps.shortsha.outputs.sha_short }}
           # TODO: this needs to be standardized. it needs to be done for each image being minted
-          NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${CI_COMMIT_REF_SLUG}"
+          if [[ "${GIT_REF}" =~ '^refs/pull/' ]]; then
+            TMP_SLUG=$(printf '%s' "${CI_COMMIT_REF_SLUG}" | sed "s/\\(.*\\)\\/\\(.*\\)/pr-\\1/g")
+            NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${TMP_SLUG}"
+          else
+            NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${CI_COMMIT_REF_SLUG}"
+          fi
           TAGS="\"${NEW_TAG}\""
           TAGS_ARCH="\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
           TAG_OR_HEAD_REF_MATCH=$(printf '%s' "${GIT_REF}" | sed -n "s,^\\(refs/tags/v|refs/heads/\\).*,\\1,p")
@@ -692,7 +697,7 @@ jobs:
           ls -la .docker/
           TAGS="${{ steps.meta.outputs.tags }}"
           TAGS=$(ARRAY=( $(printf '%s' "${TAGS}") ); IFS=","; printf "${ARRAY[*]}")
-          if [[ "${GITHUB_REF}" =~ ^refs/heads/ ]]; then
+          if [[ "${GITHUB_REF}" =~ '^refs/heads/' ]]; then
             BUILD_VER="${{ steps.get_versions.outputs.build_version }}"
             PATTERN_MATCHED=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+\\.[0-9]+)?.*\$/\\1/p")
             if [[ "${BUILD_VER}" == "${PATTERN_MATCHED}" ]]; then
