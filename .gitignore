@@ -2,4 +2,14 @@
 /.env.*
 /s0ck3t-*
 /.docker/s0ck3t-*
-/s0ck3t_*.tar
+/s0ck3t_*
+/__debug_bin
+/coverage.out
+/.devcontainer/*docker-metadata-action-bake.json
+/.devcontainer/*docker-metadata-action-bake.json.bak
+/.devcontainer/*bake.metadata-merger.hcl
+/.devcontainer/metadata-file
+/.devcontainer/.env
+/.devcontainer/go.mod
+/.devcontainer/go.sum
+/TestResults-*.json

@@ -1,0 +1,51 @@
+#!/bin/bash
+if [[ 'true' != "${SOURCING}" ]]; then
+  set -e
+  trap 'catch $? $LINENO' ERR
+  catch() {
+    echo "Error $1 occurred on $2" >&2
+  }
+  set -euo pipefail
+else
+  echo "SOURCING"
+fi
+
+SCRIPT_PATH=$0
+ORIG_DIR=$(pwd)
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # MacOS equivalent of readlink -f
+
+  cd $(dirname "${SCRIPT_PATH}")
+  SCRIPT_BASE_NAME=$(basename "${SCRIPT_PATH}")
+
+  # Iterate down a (possible) chain of symlinks
+  CUR_TARGET=${SCRIPT_BASE_NAME}
+  while [ -L "${SCRIPT_BASE_NAME}" ]
+  do
+      CUR_TARGET=$(readlink "${CUR_TARGET}")
+      cd $(dirname "${CUR_TARGET}")
+      CUR_TARGET=$(basename "${CUR_TARGET}")
+  done
+
+  # Compute the canonicalized name by finding the physical path 
+  # for the directory we're in and appending the target file.
+  SCRIPT_DIR=$(pwd -P)
+  REAL_SCRIPT_PATH="${SCRIPT_DIR}/${CUR_TARGET}"
+  cd "${ORIG_DIR}"
+else
+  REAL_SCRIPT_PATH=$(readlink -f "${SCRIPT_PATH}")
+  SCRIPT_DIR=$(dirname "${REAL_SCRIPT_PATH}")
+fi
+
+# Anything that is being copied into the dockerfile should get its permissions force here; git occassionally mangles stuff
+if ( which shasum ); then
+  SHASUM_CMD=shasum
+else
+  SHASUM_CMD=sha1sum
+fi
+(
+  cd "${SCRIPT_DIR}"
+  ls library-scripts/*.sh | xargs -I{} chmod 777 {}
+  ls library-scripts/*.sh | xargs -I{} ${SHASUM_CMD} {}
+)

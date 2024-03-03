@@ -17,10 +17,268 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+  CI_PROJECT_NAMESPACE: ${{ github.repository_owner }}
+  CI_PROJECT_NAME: ${{ github.event.repository.name }}
+  CI_PROJECT_DESCRIPTION: ""
+  CI_PROJECT_URL: ${{ github.server_url }}/${{ github.repository }}
+  CI_COMMIT_SHA: ${{ github.sha }}
+  CI_REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+  CI_COMMIT_BRANCH: ${{ startsWith(github.ref, 'refs/heads/') && github.ref_name || (startsWith(github.ref, 'refs/pull/') && github.ref_name || '') }}
+  CI_COMMIT_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+  CI_COMMIT_REF_SLUG: ${{ github.ref_name }}
+  CI_COMMIT_REF_NAME: ${{ github.ref_name }}
+  GIT_REF: ${{ github.ref }}
+  # These are not built in, but can be figured out
+  #CI_RUNNER_ID: ${RUNNER_NAME}
+
 jobs:
-  build-x64:
+  build-and-push-devcontainer-image:
     runs-on: ubuntu-latest
+
+    # allow access to github docker registry
+    permissions:
+      contents: read
+      packages: write
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      # Checkout the code
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # figure out what version this should be
+      - name: get the current dynamic git version numbers
+        id: get_versions
+        run: |
+          git clone https://github.com/xcape-inc/ci-tools.git --branch main --single-branch .git/ci-tools
+          . .git/ci-tools/get_tag_from_git.sh > /dev/null
+          echo "cur_version=${CUR_VERSION}" >> $GITHUB_OUTPUT
+          echo "long_form_cur_version=${LONG_FORM_CUR_VERSION}" >> $GITHUB_OUTPUT
+          BUILD_VER=$(printf '%s' "${CUR_VERSION}" | sed "s/^v\\([0-9.]*\\)\\(.*\\)/\\1-\\2/" | sed "s/\\(\\.*\\)-\$//")
+          echo "build_version=${BUILD_VER}" >> $GITHUB_OUTPUT
+
+      # displaye the detected version info
+      - name: show version
+        run: |
+          echo Short version: ${{ steps.get_versions.outputs.cur_version }}
+          echo Long version: ${{ steps.get_versions.outputs.long_form_cur_version }}
+          echo Build version: ${{ steps.get_versions.outputs.build_version }}
+
+      # the commit short sha is the main tag for the artifact as it can be directly traced to the git commit
+      - name: Set short sha
+        id: shortsha
+        run: echo "sha_short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # figure out if we are on a branch; that can be used to tage the image too
+      - name: Extract branch name
+        id: extract_branch
+        shell: bash
+        run: echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      # display the captured branch name
+      - name: Current branch
+        run: echo ${{ steps.extract_branch.outputs.branch }}
+
+      # Add support for more platforms with QEMU (optional)
+      # https://github.com/docker/setup-qemu-action
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          # Add whatever platforms you need in addition to x86_64
+          platforms: 'arm64,arm'
+
+      # configure the docker buildx environment (and use the buildkit engine)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # authenticate to Github's docker image repo (ghcr.io)
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Automatically gather details about the image to be built. This will be the branch name and the components of the tag if this is a tag build (eg. 1,1.0,1.0.1)
+      # TODO: you would need some more logic if, for example you have a v1 that should point to v1.1.x, but then spin a v1.0.x
+      # as that would presently set v1 back to v1.0.x
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha
+          labels: |
+            org.opencontainers.image.ref.name=${{ github.ref }}
+      
+    # Calculate possible image tags. Right now we have commit short-sha, branch name, semver components from the commit tag,
+    # the value of BUILD_VER from above (eg. 1.0.1a2) and latest if this is the main branch also
+    # append the version if on a branch and matches a version tag and append latest if on main branch
+      - name: Compute image tags
+        id: get_image_tags
+        shell: bash
+        # append the version if on a branch and matches a version tag and append latest if on main branch
+        run: |
+          BUILD_VER=${{ steps.get_versions.outputs.build_version }}
+          CI_COMMIT_SHORT_SHA=${{ steps.shortsha.outputs.sha_short }}
+          # TODO: this needs to be standardized. it needs to be done for each image being minted
+          if [[ "${GIT_REF}" =~ ^refs/pull/ ]]; then
+            TMP_SLUG=$(printf '%s' "${CI_COMMIT_REF_SLUG}" | sed "s/\\(.*\\)\\/\\(.*\\)/pr-\\1/g")
+            NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${TMP_SLUG}"
+          else
+            NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${CI_COMMIT_REF_SLUG}"
+          fi
+          TAGS="\"${NEW_TAG}\""
+          TAGS_ARCH="\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+          TAG_OR_HEAD_REF_MATCH=$(printf '%s' "${GIT_REF}" | sed -n "s,^\\(refs/tags/v|refs/heads/\\).*,\\1,p")
+          if [[ '' != "${TAG_OR_HEAD_REF_MATCH:-}" ]]; then
+            PATTERN_MATCHED=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+\\.[0-9]+)?.*\$/\\1/p")
+            if [[ "${BUILD_VER}" == "${PATTERN_MATCHED}" ]]; then
+              BUILD_MINOR_VER=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+\\.[0-9]+)?.*\$/\\1/p")
+              BUILD_MAJOR_VER=$(printf '%s' "${BUILD_VER}" | sed -En "s/^([0-9]+)?.*\$/\\1/p")
+
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${BUILD_VER}"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${BUILD_MAJOR_VER}"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:${BUILD_MINOR_VER}"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+            fi
+            if [[ 'main' == "${CI_COMMIT_BRANCH:-}" ]]; then
+              NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:latest"
+              TAGS="${TAGS},\"${NEW_TAG}\""
+              TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+            fi
+          fi
+          NEW_TAG="${CI_REGISTRY_IMAGE}/devcontainer:sha-${CI_COMMIT_SHORT_SHA}"
+          TAGS="${TAGS},\"${NEW_TAG}\""
+          TAGS_ARCH="${TAGS_ARCH},\"${NEW_TAG}-linux-${PLATFORM_ARCH:-}\""
+          export TAGS
+          export TAGS_NOARCH="${TAGS}"
+          export TAGS_ARCH
+          
+          if [ -n "${PLATFORM_ARCH:-}" ]; then export TAGS="${TAGS_ARCH}"; fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "tags_noarch=${TAGS_NOARCH}" >> $GITHUB_OUTPUT
+          echo "tags_arch=${TAGS_ARCH}" >> $GITHUB_OUTPUT
+
+      # display the tags and labels we will use for the docker image
+      - name: Show docker tags and labels
+        run: |
+          echo 'docker image tags: ${{ steps.get_image_tags.outputs.tags }}'
+          echo 'docker image labels: ${{ steps.meta.outputs.labels }}'
+          echo 'docker image description annotation: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}'
+
+      # build the images
+      - name: Build and push Docker image
+        run: |
+          export CUR_VERSION='${{ steps.get_versions.outputs.cur_version }}'
+          export LONG_FORM_CUR_VERSION='${{ steps.get_versions.outputs.long_form_cur_version }}'
+          export BUILD_VER='${{ steps.get_versions.outputs.build_version }}'
+          export CI_RUNNER_ID="${RUNNER_NAME}"
+          export TAGS='${{ steps.get_image_tags.outputs.tags }}'
+          export TAGS_NOARCH='${{ steps.get_image_tags.outputs.tags_noarch }}'
+          export TAGS_ARCH='${{ steps.get_image_tags.outputs.tags_arch }}'
+          if [ -n "${PLATFORM_ARCH:-}" ]; then export TAGS="${TAGS_ARCH}"; fi
+          #if [[ 'main' == "${CI_COMMIT_BRANCH:-}" || 'master' == "${CI_COMMIT_BRANCH:-}" ]]; then
+            PUSH_BUILD_CACHE=true
+          #else
+          #  echo "** Skipping Build cache push due to branch '${CI_COMMIT_BRANCH:-}' != 'main' or 'master'"
+          #fi
+
+          env
+          pwd
+          ls -la
+          cp -a go.mod go.sum .devcontainer/
+          DOCKER_SERVICES="devcontainer" USE_BUILDX_BUILDER=true PULL_IMAGES=true PUSH_IMAGE=true PUSH_BUILD_CACHE=${PUSH_BUILD_CACHE:-} .devcontainer/build_docker_images.sh
+
+    # store these values in case another stage is added to run afterwards, such as to use the image for some purpose
+    outputs:
+      cur_version: ${{ steps.get_versions.outputs.cur_version }}
+      long_form_cur_version: ${{ steps.get_versions.outputs.long_form_cur_version }}
+      sha_short: ${{ steps.shortsha.outputs.sha_short }}
+
+  build-x64:
+    needs:
+      - build-and-push-devcontainer-image
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+      # work around for https://github.com/actions/checkout/issues/956
+      # thanks, I hate it.
+      # options: --user root
+    defaults:
+      run:
+        shell: /bin/bash -e {0}
+
+    steps:
+      - name: Fix Incompatible user from 956
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          # Fixes the unknown group
+          sudo groupadd -g 127 github
+          # Fix the permissions on the home directory for the updated user ID
+          sudo chown -R 1001:1001 /home/vscode
+          # Changes the group id of the vscode group to 1001 and make sure its in githubs group
+          sudo groupmod -g 1001 vscode
+          # Changes the user id of the vscode user to 1001 and make sure its in githubs group
+          sudo usermod -u 1001 -g 1001 -aG github vscode
+      
+      - name: Verify new user id; fix go install and packages
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          sudo chown -R vscode /go
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -61,18 +319,93 @@ jobs:
 
       - name: Build amd64
         run: |
-          make s0ck3t-linux-amd64 BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-amd64 s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-amd64
+          make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-amd64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-amd64
+          make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-amd64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-amd64
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
         with:
           name: s0ck3t-amd64
-          path: s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-amd64
+          path: s0ck3t_v${{ steps.get_versions.outputs.build_version }}_*
           retention-days: 5
 
+      - name: Test with Go
+        run: go test -coverprofile=coverage.out -json | tee TestResults-amd64.json
+
+      - name: Upload Go test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Go-results-amd64
+          path: |
+            TestResults-amd64.json
+            coverage.out
+
+      # TODO: add step to publish documentation, test results, and code coverage and web pages and assets
+
   build-arm64:
+    needs:
+      - build-and-push-devcontainer-image
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+    defaults:
+      run:
+        shell: /bin/bash -e {0}
+
     steps:
+      - name: Fix Incompatible user from 956
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          # Fixes the unknown group
+          sudo groupadd -g 127 github
+          # Fix the permissions on the home directory for the updated user ID
+          sudo chown -R 1001:1001 /home/vscode
+          # Changes the group id of the vscode group to 1001 and make sure its in githubs group
+          sudo groupmod -g 1001 vscode
+          # Changes the user id of the vscode user to 1001
+          sudo usermod -u 1001 -g 1001 -aG github vscode
+      
+      - name: Verify new user id; fix go install and packages
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          sudo chown -R vscode /go
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -106,25 +439,82 @@ jobs:
       - name: Current uid:gid
         run: echo ${{ steps.uidgid.outputs.uid_gid }}
 
-      - name: Setup go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '^1.20.3' # The Go version to download (if necessary) and use.
-
       - name: Build arm64
         run: |
-          make s0ck3t-linux-arm64 BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm64 s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm64
+          ARCH=aarch64 make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm64
+          ARCH=aarch64 make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm64
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
         with:
           name: s0ck3t-arm64
-          path: s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm64
+          path: s0ck3t_v${{ steps.get_versions.outputs.build_version }}_*
           retention-days: 5
 
   build-arm:
+    needs:
+      - build-and-push-devcontainer-image
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/devcontainer:sha-${{ needs.build-and-push-devcontainer-image.outputs.sha_short }}
+    defaults:
+      run:
+        shell: /bin/bash -e {0}
+
     steps:
+      - name: Fix Incompatible user from 956
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          # Fixes the unknown group
+          sudo groupadd -g 127 github
+          # Fix the permissions on the home directory for the updated user ID
+          sudo chown -R 1001:1001 /home/vscode
+          # Changes the group id of the vscode group to 1001 and make sure its in githubs group
+          sudo groupmod -g 1001 vscode
+          # Changes the user id of the vscode user to 1001
+          sudo usermod -u 1001 -g 1001 -aG github vscode
+      
+      - name: Verify new user id; fix go install and packages
+        run: |
+          id -u
+          id -g
+          whoami
+          echo '-- /__w/s0ck3t/s0ck3t --'
+          ls -la /__w/s0ck3t/s0ck3t
+          echo '-- /__e --'
+          ls -la /__e
+          echo '-- /__w/_temp --'
+          ls -la /__w/_temp
+          echo '-- /__w/_actions --'
+          ls -la /__w/_actions
+          echo '-- /__t --'
+          ls -la /__t
+          echo '-- /github/home --'
+          ls -la /github/home
+          echo '-- /github/workflow --'
+          ls -la /github/workflow
+          echo '-- /__w/_temp/_runner_file_commands --'
+          ls -la /__w/_temp/_runner_file_commands
+          sudo chown -R vscode /go
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -165,16 +555,18 @@ jobs:
 
       - name: Build arm
         run: |
-          make s0ck3t-linux-arm BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm
+          ARCH=arm make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm
+          ARCH=arm make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
         with:
           name: s0ck3t-arm
-          path: s0ck3t-v${{ steps.get_versions.outputs.build_version }}-linux-arm
+          path: s0ck3t_v${{ steps.get_versions.outputs.build_version }}_*
           retention-days: 5
 
   # This workflow contains a single job called "build"
+  # TODO: this pattern probably needs some work to match the devcontainer image build pattern using the devcontainer env
   build-and-push-image:
     needs:
       - build-x64
@@ -245,7 +637,7 @@ jobs:
           platforms: 'arm64,arm'
 
       # configure the docker buildx environment (and use the buildkit engine)
-      - name: Set up g
+      - name: Set up docker buildx
         uses: docker/setup-buildx-action@v3
 
       # authenticate to Github's docker image repo (ghcr.io)
@@ -302,6 +694,7 @@ jobs:
         shell: bash
         # append the version if on a branch and matches a version tag and append latest if on main branch
         run: |
+          ls -la .docker/
           TAGS="${{ steps.meta.outputs.tags }}"
           TAGS=$(ARRAY=( $(printf '%s' "${TAGS}") ); IFS=","; printf "${ARRAY[*]}")
           if [[ "${GITHUB_REF}" =~ ^refs/heads/ ]]; then

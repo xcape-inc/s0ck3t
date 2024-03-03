@@ -1,21 +1,34 @@
-BINARY_NAME=s0ck3t
+BINARY_NAME ?= s0ck3t
 BINARY_VERSION ?= 0.0.0
-ARCH := $(shell uname -m)
+ARCH ?= $(shell uname -m)
+TRIMPATH ?= true
+
+ifdef LDFLAGS
+	EXTRA_LDFLAGS := $(shell echo " ${LDFLAGS}")
+endif
+
+ifdef GCFLAGS
+	GCFLAGS_PARAM := -gcflags='$(GCFLAGS)'
+endif
+
+ifeq ($(TRIMPATH),true)
+	TRIMPATH_PARM := $(shell echo " -trimpath")
+endif
 
 .PHONY: run build build_all clean ${BINARY_NAME}-linux-x86_64 ${BINARY_NAME}-linux-aarch64 ${BINARY_NAME}-linux-armhf docker
 
 ${BINARY_NAME}-linux-amd64:
-	GOARCH=amd64 GOOS=linux go build -ldflags="-X 'main.Version=v${BINARY_VERSION}'" -o ${BINARY_NAME}-linux-amd64
+	GOARCH=amd64 GOOS=linux go build -ldflags="-X 'main.Version=v${BINARY_VERSION}'${EXTRA_LDFLAGS}"${TRIMPATH_PARM} -o ${BINARY_NAME}-linux-amd64
 
 ${BINARY_NAME}-linux-x86_64: ${BINARY_NAME}-linux-amd64
 
 ${BINARY_NAME}-linux-arm64:
-	GOARCH=arm64 GOOS=linux go build -ldflags="-X 'main.Version=v${BINARY_VERSION}'" -o ${BINARY_NAME}-linux-arm64
+	GOARCH=arm64 GOOS=linux go build -ldflags="-X 'main.Version=v${BINARY_VERSION}'${EXTRA_LDFLAGS}"${TRIMPATH_PARM} -o ${BINARY_NAME}-linux-arm64
 
 ${BINARY_NAME}-linux-aarch64: ${BINARY_NAME}-linux-arm64
 
 ${BINARY_NAME}-linux-arm:
-	GOARCH=arm GOARM=6 GOOS=linux go build -ldflags="-X 'main.Version=v${BINARY_VERSION}'" -o ${BINARY_NAME}-linux-arm
+	GOARCH=arm GOARM=6 GOOS=linux go build -ldflags="-X 'main.Version=v${BINARY_VERSION}'${EXTRA_LDFLAGS}"${TRIMPATH_PARM} -o ${BINARY_NAME}-linux-arm
 
 ${BINARY_NAME}-linux-armhf: ${BINARY_NAME}-linux-arm
 

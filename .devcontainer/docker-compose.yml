@@ -1,22 +1,16 @@
+version: '3'
 services:
-  socket:
-    image: ghcr.io/xcape-inc/s0ck3t
-    build:
-      dockerfile: ".devcontainer/Dockerfile"
-      args:
-        # Update the VARIANT arg to pick a version of Go: 1, 1.19, 1.18
-        # Append -bullseye or -buster to pin to an OS version.
-        # Use -bullseye variants on local arm64/Apple Silicon.
-        VARIANT": "1-bullseye"
-        # Options
-        NODE_VERSION: "lts/*"
-      context: ..
+  devcontainer:
+    image: ${CI_REGISTRY_IMAGE}/devcontainer:${DOCKER_TAG}
+    #command: ["--init", "--env-file", ".devcontainer/devcontainer.env"]
     volumes:
-      - ..:/workspace:delegated
+      - ..:/workspaces/primary:delegated
+      - ${HOME}/.ssh:/home/vscode/.ssh
       - type: bind
         source: /var/run/docker.sock
         target: /var/run/docker-host.sock
-    security_opt:
-      - seccomp:unconfined
+      - ${HOME}/.github:/home/vscode/.github
+    environment:
+      - "LOCAL_WORKSPACE_FOLDER=/workspaces/primary"
+      - "GITHUB_WORKFLOW_INSTANCE_URL=https://github.com"
     init: true
-
