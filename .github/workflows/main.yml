@@ -243,6 +243,7 @@ jobs:
           sudo usermod -aG github vscode
           sudo chmod g+w /__w/_temp/_runner_file_commands
           sudo chmod g+w /__w/_temp/_runner_file_commands/*
+          sudo chmod g+w /__w/s0ck3t/s0ck3t
           ls -la /__w/_temp/_runner_file_commands
 
       - name: Checkout
@@ -273,6 +274,7 @@ jobs:
 
       - name: get the current dynamic git version numbers
         id: get_versions
+        shell: /bin/bash -e {0}
         run: |
           git clone https://github.com/xcape-inc/ci-tools.git --branch main --single-branch .git/ci-tools
           . .git/ci-tools/get_tag_from_git.sh > /dev/null
