@@ -325,7 +325,7 @@ jobs:
           retention-days: 5
 
       - name: Test with Go
-        run: go test -coverprofile=coverage.out -json > TestResults-amd64.json
+        run: go test -coverprofile=coverage.out -json | tee TestResults-amd64.json
 
       - name: Upload Go test results
         uses: actions/upload-artifact@v4

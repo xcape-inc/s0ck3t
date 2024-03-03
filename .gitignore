@@ -12,3 +12,4 @@
 /.devcontainer/.env
 /.devcontainer/go.mod
 /.devcontainer/go.sum
+/TestResults-*.json
