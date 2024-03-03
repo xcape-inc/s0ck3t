@@ -436,8 +436,8 @@ jobs:
 
       - name: Build arm64
         run: |
-          make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm64
-          make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm64
+          ARCH=aarch64 make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm64
+          ARCH=aarch64 make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm64 s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm64
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4
@@ -550,8 +550,8 @@ jobs:
 
       - name: Build arm
         run: |
-          make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm
-          make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm
+          ARCH=arm make clean build BINARY_NAME=s0ck3t-debug BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-debug-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_debug-linux-arm
+          ARCH=arm make clean build 'LDFLAGS=-s -w' BINARY_VERSION=${{ steps.get_versions.outputs.build_version }} && mv s0ck3t-linux-arm s0ck3t_v${{ steps.get_versions.outputs.build_version }}_linux-arm
 
       - name: Store image artifact
         uses: actions/upload-artifact@v4

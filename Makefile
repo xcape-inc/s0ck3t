@@ -1,6 +1,6 @@
 BINARY_NAME ?= s0ck3t
 BINARY_VERSION ?= 0.0.0
-ARCH := $(shell uname -m)
+ARCH ?= $(shell uname -m)
 TRIMPATH ?= true
 
 ifdef LDFLAGS
