@@ -246,7 +246,9 @@ jobs:
           sudo groupadd -g 127 github
           # Fix the permissions on the home directory for the updated user ID
           sudo chown -R 1001:1001 /home/vscode
-          # Changes the user id of the vscode user to 1001
+          # Changes the group id of the vscode group to 1001 and make sure its in githubs group
+          sudo groupmod -g 1001 vscode
+          # Changes the user id of the vscode user to 1001 and make sure its in githubs group
           sudo usermod -u 1001 -g 1001 -aG github vscode
       
       - name: Verify new user id
