@@ -689,6 +689,7 @@ jobs:
         shell: bash
         # append the version if on a branch and matches a version tag and append latest if on main branch
         run: |
+          ls -la .docker/
           TAGS="${{ steps.meta.outputs.tags }}"
           TAGS=$(ARRAY=( $(printf '%s' "${TAGS}") ); IFS=","; printf "${ARRAY[*]}")
           if [[ "${GITHUB_REF}" =~ ^refs/heads/ ]]; then

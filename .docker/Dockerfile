@@ -7,7 +7,7 @@ ARG TARGETOS
 ARG TARGETARCH
 COPY s0ck3t-*-*-* /opt/s0ck3t/
 RUN ls -la /opt/s0ck3t/ && \
-    chmod +x /opt/s0ck3t/s0ck3t_*_${TARGETOS}-${TARGETARCH} && \
+    chmod +x /opt/s0ck3t/s0ck3t_*_*-* && \
     ln -s /opt/s0ck3t/s0ck3t_*_${TARGETOS}-${TARGETARCH} /opt/s0ck3t/s0ck3t
 
 ENTRYPOINT ["/opt/s0ck3t/s0ck3t"]
