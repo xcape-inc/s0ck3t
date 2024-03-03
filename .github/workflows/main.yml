@@ -251,7 +251,7 @@ jobs:
           # Changes the user id of the vscode user to 1001 and make sure its in githubs group
           sudo usermod -u 1001 -g 1001 -aG github vscode
       
-      - name: Verify new user id
+      - name: Verify new user id; fix go install and packages
         run: |
           id -u
           id -g
@@ -272,6 +272,7 @@ jobs:
           ls -la /github/workflow
           echo '-- /__w/_temp/_runner_file_commands --'
           ls -la /__w/_temp/_runner_file_commands
+          sudo chown -R vscode /go
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -377,7 +378,7 @@ jobs:
           # Changes the user id of the vscode user to 1001
           sudo usermod -u 1001 -g 1001 -aG github vscode
       
-      - name: Verify new user id
+      - name: Verify new user id; fix go install and packages
         run: |
           id -u
           id -g
@@ -398,6 +399,7 @@ jobs:
           ls -la /github/workflow
           echo '-- /__w/_temp/_runner_file_commands --'
           ls -la /__w/_temp/_runner_file_commands
+          sudo chown -R vscode /go
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -485,7 +487,7 @@ jobs:
           # Changes the user id of the vscode user to 1001
           sudo usermod -u 1001 -g 1001 -aG github vscode
       
-      - name: Verify new user id
+      - name: Verify new user id; fix go install and packages
         run: |
           id -u
           id -g
@@ -506,6 +508,7 @@ jobs:
           ls -la /github/workflow
           echo '-- /__w/_temp/_runner_file_commands --'
           ls -la /__w/_temp/_runner_file_commands
+          sudo chown -R vscode /go
 
       - name: Checkout
         uses: actions/checkout@v4
